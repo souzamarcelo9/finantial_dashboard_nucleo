@@ -1,4 +1,4 @@
-import { Heart, TrendingUp } from "lucide-react";
+import { Heart } from "lucide-react";
 
 export const Footer = () => (
   <footer className="text-center mt-12 mb-8">
@@ -7,15 +7,19 @@ export const Footer = () => (
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-pink-600/5"></div>
 
       <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg shadow-lg">
-            <TrendingUp size={20} className="text-white" />
-          </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src="/logo-nucleo-mark.png"
+            alt="Núcleo Organização Contábil LTDA"
+            className="h-8 w-8 shrink-0 object-contain"
+          />
           <span className="text-gray-300 font-medium">Painel Financeiro</span>
-          <span className="text-gray-500">&copy; 2025 JADS Suporte</span>
+          <span className="text-gray-500 truncate">
+            &copy; 2026 Núcleo Organização Contábil LTDA
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 text-gray-400">
+        <div className="flex items-center gap-2 text-gray-400 sm:shrink-0">
           <span className="text-sm">Feito com</span>
           <Heart size={16} className="text-red-400 animate-pulse" />
           <span className="text-sm">para melhores insights financeiros</span>

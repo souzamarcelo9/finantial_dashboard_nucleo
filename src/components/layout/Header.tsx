@@ -1,4 +1,4 @@
-import { FileSpreadsheet, LogOut, TrendingUp, Upload } from "lucide-react";
+import { FileSpreadsheet, LogOut, Upload } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
@@ -45,22 +45,30 @@ export const Header = ({ onFileUpload }: HeaderProps) => {
         </span>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg">
-            <TrendingUp size={28} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        {/* Identidade: símbolo + título */}
+        <div className="flex items-center gap-4 min-w-0">
+          <img
+            src="/logo-nucleo-mark.png"
+            alt="Núcleo Organização Contábil LTDA"
+            className="h-12 sm:h-14 w-auto shrink-0 object-contain"
+          />
+
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
               Painel Financeiro
             </h1>
-            <p className="text-gray-400 text-sm sm:text-base mt-1">
+            <p className="mt-0.5 text-sm sm:text-base font-semibold text-teal-300 leading-snug">
+              Núcleo Organização Contábil LTDA
+            </p>
+            <p className="text-gray-400 text-xs sm:text-sm mt-1">
               Sua plataforma inteligente de controle financeiro
             </p>
           </div>
         </div>
 
-        <div className="mt-6 sm:mt-0 flex flex-wrap items-center gap-3">
+        {/* Ações */}
+        <div className="flex flex-wrap items-center gap-3 xl:shrink-0">
           <ManualEntryModal />
 
           <label

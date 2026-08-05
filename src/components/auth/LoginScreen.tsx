@@ -1,4 +1,4 @@
-import { AlertCircle, Lock, Mail, TrendingUp, User as UserIcon } from "lucide-react";
+import { AlertCircle, Lock, Mail, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -43,13 +43,17 @@ export const LoginScreen = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-900 to-black px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-900 to-black px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg mb-4">
-            <TrendingUp size={32} className="text-white" />
-          </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Painel Financeiro</h1>
+          <img
+            src="/logo-nucleo-vertical-dark.png"
+            alt="Núcleo Organização Contábil LTDA"
+            className="h-28 sm:h-32 w-auto mx-auto mb-5"
+          />
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Painel Financeiro
+          </h1>
           <p className="text-gray-400 mt-1">
             {isRegister ? "Crie sua conta para começar" : "Entre para acessar seus dados"}
           </p>
@@ -186,6 +190,9 @@ export const LoginScreen = () => {
 
         <p className="text-center text-gray-500 text-xs mt-6">
           Seus dados ficam vinculados à sua conta e não são vistos por outros usuários.
+        </p>
+        <p className="text-center text-gray-600 text-xs mt-2">
+          &copy; 2026 Núcleo Organização Contábil LTDA
         </p>
       </div>
     </div>
