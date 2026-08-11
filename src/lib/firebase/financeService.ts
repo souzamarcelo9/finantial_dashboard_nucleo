@@ -15,6 +15,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -24,12 +25,13 @@ import {
   Timestamp,
   where,
 } from "firebase/firestore";
-import type { Transaction } from "../../types";
+import type { CategoryMapping, Transaction } from "../../types";
 import { db, getCurrentUserId, isFirebaseConfigured } from "./firebaseConfig";
 
 const TRANSACTIONS_COLLECTION = "transactions";
 const BASELINES_COLLECTION = "baselines";
 const HISTORY_COLLECTION = "importHistory";
+const CATEGORIES_COLLECTION = "categoryCatalogs";
 
 export interface Baseline {
   id: string;
@@ -137,9 +139,7 @@ export const subscribeToTransactions = (
 };
 
 /** Salva uma baseline (foto do orçamento/config em um momento) do usuário autenticado */
-export const saveBaseline = async (
-  baseline: Omit<Baseline, "id" | "userId"> & { id?: string }
-) => {
+export const saveBaseline = async (baseline: Omit<Baseline, "id" | "userId"> & { id?: string }) => {
   if (!isFirebaseConfigured() || !db) return null;
   const userId = requireUserId();
   const id = baseline.id ?? doc(collection(db, BASELINES_COLLECTION)).id;
@@ -193,4 +193,32 @@ export const fetchHistory = async (): Promise<ImportHistoryEntry[]> => {
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as ImportHistoryEntry);
+};
+
+/**
+ * Catálogo de categorias/subcategorias do usuário.
+ *
+ * Fica em um único documento por usuário (id = userId), porque é um objeto
+ * pequeno lido inteiro a cada carregamento — não vale o custo de uma
+ * coleção com um documento por categoria.
+ */
+export const saveCategoryCatalog = async (catalog: CategoryMapping): Promise<void> => {
+  if (!isFirebaseConfigured() || !db) return;
+  const userId = requireUserId();
+  await setDoc(doc(db, CATEGORIES_COLLECTION, userId), {
+    userId,
+    catalog,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+/** Lê o catálogo de categorias do usuário; retorna null se ainda não existir */
+export const fetchCategoryCatalog = async (): Promise<CategoryMapping | null> => {
+  if (!isFirebaseConfigured() || !db) return null;
+  const userId = getCurrentUserId();
+  if (!userId) return null;
+  const snap = await getDoc(doc(db, CATEGORIES_COLLECTION, userId));
+  if (!snap.exists()) return null;
+  const data = snap.data() as { catalog?: CategoryMapping };
+  return data.catalog ?? null;
 };

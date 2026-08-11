@@ -1,9 +1,11 @@
 import { hierarchy, treemap, treemapBinary } from "d3-hierarchy";
 import { scaleOrdinal } from "d3-scale";
 import { select } from "d3-selection";
+import { FolderPlus, Settings2, TagsIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "../../../lib/formatters";
 import type { Transaction } from "../../../types";
+import { CategoryManagerModal } from "../../categories";
 
 interface TreemapChartProps {
   filteredData: Transaction[];
@@ -37,6 +39,10 @@ export const TreemapChart = ({ filteredData, chartRef }: TreemapChartProps) => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [showSubcategories, setShowSubcategories] = useState(false);
+  const [categoryManager, setCategoryManager] = useState<{
+    open: boolean;
+    focus: "category" | "subcategory";
+  }>({ open: false, focus: "category" });
 
   // Get available years from data
   const availableYears = useMemo(() => {
@@ -417,44 +423,82 @@ export const TreemapChart = ({ filteredData, chartRef }: TreemapChartProps) => {
   }, [chartRef]);
 
   return (
-    <div className="lg:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg h-[600px] flex flex-col">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold text-white">Mapa de árvore de detalhamento de despesas</h3>
-        <button
-          onClick={() => {
-            if (chartRef?.current) {
-              const svgElement = chartRef.current;
-              const serializer = new XMLSerializer();
-              const svgString = serializer.serializeToString(svgElement);
-              const blob = new Blob([svgString], { type: "image/svg+xml" });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              const fileName = `expense-treemap-${viewMode}-${currentYear}`;
-              const monthSuffix = viewMode === "month" ? `-${currentMonth}` : "";
-              link.download = `${fileName + monthSuffix}.svg`;
-              link.href = url;
-              link.click();
-              URL.revokeObjectURL(url);
-            }
-          }}
-          className="text-gray-400 hover:text-white"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <div className="lg:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg min-h-[600px] flex flex-col">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <h3 className="text-xl font-semibold text-white">
+          Mapa de árvore de detalhamento de despesas
+        </h3>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCategoryManager({ open: true, focus: "category" })}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold transition-colors"
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7,10 12,15 17,10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
+            <FolderPlus size={16} />
+            Nova categoria
+          </button>
+          <button
+            type="button"
+            onClick={() => setCategoryManager({ open: true, focus: "subcategory" })}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold transition-colors"
+          >
+            <TagsIcon size={16} />
+            Nova subcategoria
+          </button>
+          <button
+            type="button"
+            onClick={() => setCategoryManager({ open: true, focus: "category" })}
+            title="Gerenciar categorias e subcategorias"
+            aria-label="Gerenciar categorias e subcategorias"
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/70 transition-colors"
+          >
+            <Settings2 size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (chartRef?.current) {
+                const svgElement = chartRef.current;
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(svgElement);
+                const blob = new Blob([svgString], { type: "image/svg+xml" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                const fileName = `expense-treemap-${viewMode}-${currentYear}`;
+                const monthSuffix = viewMode === "month" ? `-${currentMonth}` : "";
+                link.download = `${fileName + monthSuffix}.svg`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+              }
+            }}
+            className="text-gray-400 hover:text-white"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7,10 12,15 17,10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      <CategoryManagerModal
+        open={categoryManager.open}
+        onClose={() => setCategoryManager((prev) => ({ ...prev, open: false }))}
+        initialFocus={categoryManager.focus}
+      />
 
       {/* Controls */}
       <div className="flex justify-between items-center mb-3 bg-gray-700/50 rounded-lg p-2">
@@ -549,7 +593,9 @@ export const TreemapChart = ({ filteredData, chartRef }: TreemapChartProps) => {
       </div>
 
       <div className="mt-2 text-xs text-gray-600">
-        <p className="mb-1">Tamanho do retângulo = valor da despesa. Passe o mouse para obter detalhes.</p>
+        <p className="mb-1">
+          Tamanho do retângulo = valor da despesa. Passe o mouse para obter detalhes.
+        </p>
         <div className="text-xs text-gray-500">
           {showSubcategories
             ? "Mostrando subcategorias dentro das categorias principais"

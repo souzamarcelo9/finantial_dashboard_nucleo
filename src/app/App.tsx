@@ -15,30 +15,31 @@ import {
   Tooltip,
 } from "chart.js";
 import { type RefObject, Suspense, useEffect, useRef, useState } from "react";
+import { LoginScreen } from "../components/auth/LoginScreen";
 import { Footer } from "../components/layout/Footer";
 // Components
 import { Header } from "../components/layout/Header";
 import { CustomTabs, TabContent } from "../components/ui/CustomTabs";
 import { LoadingSpinner } from "../components/ui/Loading";
 import { SectionSkeleton } from "../components/ui/SectionSkeleton";
-import { LoginScreen } from "../components/auth/LoginScreen";
 // Config
 import { TABS_CONFIG } from "../config/tabs";
-// Auth
-import { useAuth } from "../context/AuthContext";
 // Utils
 import { initialCsvData } from "../constants/index";
+// Auth
+import { useAuth } from "../context/AuthContext";
 // Hooks
 import { useDataProcessor, useFilteredData, useUniqueValues } from "../hooks/useDataProcessor";
 import {
   useError,
+  useFinancialStore,
+  useLoadCategoryCatalog,
   useLoadFromFirebase,
   useLoading,
   useSetError,
   useSetLoading,
   useSetTransactions,
   useTransactions,
-  useFinancialStore,
 } from "../store/financialStore";
 import type { SortConfig, TransactionSortKey } from "../types";
 import { lazyLoad } from "../utils/lazyLoad";
@@ -161,6 +162,7 @@ const App = () => {
   const error = useError();
   const setError = useSetError();
   const loadFromFirebase = useLoadFromFirebase();
+  const loadCategoryCatalog = useLoadCategoryCatalog();
   const resetStore = useFinancialStore((state) => state.reset);
 
   // Carrega os lançamentos do usuário autenticado ao logar; limpa tudo ao deslogar
@@ -170,6 +172,7 @@ const App = () => {
     }
     if (user) {
       loadFromFirebase();
+      loadCategoryCatalog();
     } else {
       resetStore();
     }

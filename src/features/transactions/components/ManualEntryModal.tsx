@@ -1,7 +1,11 @@
 import { PlusCircle, X } from "lucide-react";
 import { useState } from "react";
-import { DEFAULT_CATEGORIES } from "../../../constants";
-import { useAddTransaction, useBudgetPreferences, useFirebaseEnabled } from "../../../store/financialStore";
+import {
+  useAddTransaction,
+  useBudgetPreferences,
+  useCategoryCatalog,
+  useFirebaseEnabled,
+} from "../../../store/financialStore";
 import type { Transaction, TransactionType } from "../../../types";
 
 const TRANSACTION_TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
@@ -20,10 +24,12 @@ export const ManualEntryModal = () => {
   const addTransaction = useAddTransaction();
   const firebaseEnabled = useFirebaseEnabled();
   const budgetPreferences = useBudgetPreferences();
+  // Catálogo mantido em "Categorias e subcategorias" (tela de Categorias)
+  const categoryCatalog = useCategoryCatalog();
 
   const customCategoryNames = Object.values(budgetPreferences.customCategories).flat();
   const categories: Record<string, string[]> = {
-    ...DEFAULT_CATEGORIES,
+    ...categoryCatalog,
     ...(customCategoryNames.length ? { Personalizadas: customCategoryNames } : {}),
   };
 
@@ -141,7 +147,9 @@ export const ManualEntryModal = () => {
                   <select
                     id="me-type"
                     value={form.type}
-                    onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as TransactionType }))}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, type: e.target.value as TransactionType }))
+                    }
                     className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
                   >
                     {TRANSACTION_TYPE_OPTIONS.map((opt) => (

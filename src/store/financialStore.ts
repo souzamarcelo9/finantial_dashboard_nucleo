@@ -1,20 +1,48 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { BUDGET_ALLOCATION_DEFAULTS } from "../constants";
+import { BUDGET_ALLOCATION_DEFAULTS, DEFAULT_CATEGORIES } from "../constants";
 import {
-  type Baseline,
-  type ImportHistoryEntry,
   addHistoryEntry,
+  type Baseline,
   deleteTransaction as fbDeleteTransaction,
+  saveBaseline as fbSaveBaseline,
+  saveCategoryCatalog as fbSaveCategoryCatalog,
+  saveTransaction as fbSaveTransaction,
   fetchBaselines,
+  fetchCategoryCatalog,
   fetchHistory,
   fetchTransactions,
-  saveBaseline as fbSaveBaseline,
-  saveTransaction as fbSaveTransaction,
+  type ImportHistoryEntry,
   saveTransactionsBulk,
 } from "../lib/firebase/financeService";
 import { isFirebaseConfigured } from "../lib/firebase/firebaseConfig";
-import type { Transaction } from "../types";
+import type { CategoryMapping, Transaction } from "../types";
+
+/** Normaliza um nome de categoria/subcategoria digitado pelo usuário */
+const normalizeName = (value: string): string => value.trim().replace(/\s+/g, " ");
+
+/** Chave de comparação: ignora caixa e acentuação para evitar duplicatas */
+const comparableKey = (value: string): string =>
+  normalizeName(value)
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const findExisting = (names: string[], candidate: string): string | undefined =>
+  names.find((name) => comparableKey(name) === comparableKey(candidate));
+
+/**
+ * Envia o catálogo para o Firestore quando o Firebase está configurado.
+ * Falhas são registradas no estado de erro, sem desfazer a alteração local:
+ * o usuário continua trabalhando e o localStorage mantém o dado.
+ */
+const syncCatalog = (catalog: CategoryMapping, onError: (message: string) => void): void => {
+  if (!isFirebaseConfigured()) return;
+  fbSaveCategoryCatalog(catalog).catch((err) => {
+    console.error("Erro ao sincronizar categorias com o Firebase:", err);
+    onError((err as Error).message);
+  });
+};
 
 interface BudgetAllocation {
   needs: number;
@@ -38,11 +66,17 @@ interface DateRange {
   end: Date | null;
 }
 
+export interface CategoryMutationResult {
+  ok: boolean;
+  error?: string;
+}
+
 interface FinancialStore {
   // State
   transactions: Transaction[];
   dateRange: DateRange;
   budgetPreferences: BudgetPreferences;
+  categoryCatalog: CategoryMapping;
   loading: boolean;
   error: string | null;
   firebaseEnabled: boolean;
@@ -65,6 +99,16 @@ interface FinancialStore {
   updateDateRange: (start: Date | null, end: Date | null) => void;
   updateBudgetAllocation: (allocation: BudgetAllocation) => void;
   updateCustomCategories: (type: keyof CustomCategories, categories: string[]) => void;
+
+  // Categorias / subcategorias
+  loadCategoryCatalog: () => Promise<void>;
+  addCategory: (name: string) => CategoryMutationResult;
+  renameCategory: (oldName: string, newName: string) => CategoryMutationResult;
+  removeCategory: (name: string) => CategoryMutationResult;
+  addSubcategory: (category: string, name: string) => CategoryMutationResult;
+  renameSubcategory: (category: string, oldName: string, newName: string) => CategoryMutationResult;
+  removeSubcategory: (category: string, name: string) => CategoryMutationResult;
+  resetCategoryCatalog: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -82,6 +126,7 @@ const initialState = {
       savings: [],
     },
   },
+  categoryCatalog: DEFAULT_CATEGORIES as CategoryMapping,
   loading: false,
   error: null,
   firebaseEnabled: isFirebaseConfigured(),
@@ -118,8 +163,8 @@ export const useFinancialStore = create<FinancialStore>()(
             .catch((err) => {
               console.error("Erro ao sincronizar com o Firebase:", err);
               console.error("Erro ao sincronizar com o Firebase:", err);
-            console.error("Erro ao sincronizar com o Firebase:", err);
-          set({ error: (err as Error).message });
+              console.error("Erro ao sincronizar com o Firebase:", err);
+              set({ error: (err as Error).message });
             })
             .finally(() => set({ syncing: false }));
         }
@@ -139,7 +184,7 @@ export const useFinancialStore = create<FinancialStore>()(
           } catch (err) {
             console.error("Erro ao sincronizar com o Firebase:", err);
             console.error("Erro ao sincronizar com o Firebase:", err);
-          set({ error: (err as Error).message });
+            set({ error: (err as Error).message });
           } finally {
             set({ syncing: false });
           }
@@ -148,9 +193,7 @@ export const useFinancialStore = create<FinancialStore>()(
 
       updateTransaction: async (transaction) => {
         set((state) => ({
-          transactions: state.transactions.map((t) =>
-            t.id === transaction.id ? transaction : t
-          ),
+          transactions: state.transactions.map((t) => (t.id === transaction.id ? transaction : t)),
         }));
         if (isFirebaseConfigured()) {
           try {
@@ -158,7 +201,7 @@ export const useFinancialStore = create<FinancialStore>()(
           } catch (err) {
             console.error("Erro ao sincronizar com o Firebase:", err);
             console.error("Erro ao sincronizar com o Firebase:", err);
-          set({ error: (err as Error).message });
+            set({ error: (err as Error).message });
           }
         }
       },
@@ -171,7 +214,7 @@ export const useFinancialStore = create<FinancialStore>()(
           } catch (err) {
             console.error("Erro ao sincronizar com o Firebase:", err);
             console.error("Erro ao sincronizar com o Firebase:", err);
-          set({ error: (err as Error).message });
+            set({ error: (err as Error).message });
           }
         }
       },
@@ -254,6 +297,202 @@ export const useFinancialStore = create<FinancialStore>()(
           },
         })),
 
+      // ------------------------------------------------------------------
+      // Categorias e subcategorias
+      // ------------------------------------------------------------------
+
+      loadCategoryCatalog: async () => {
+        if (!isFirebaseConfigured()) return;
+        try {
+          const remote = await fetchCategoryCatalog();
+          if (remote && Object.keys(remote).length > 0) {
+            set({ categoryCatalog: remote });
+          } else {
+            // Primeiro acesso do usuário: publica o catálogo padrão/local
+            syncCatalog(get().categoryCatalog, (message) => set({ error: message }));
+          }
+        } catch (err) {
+          console.error("Erro ao carregar categorias do Firebase:", err);
+          set({ error: (err as Error).message });
+        }
+      },
+
+      addCategory: (name) => {
+        const clean = normalizeName(name);
+        if (!clean) {
+          return { ok: false, error: "Informe um nome para a categoria." };
+        }
+        const catalog = get().categoryCatalog;
+        const duplicate = findExisting(Object.keys(catalog), clean);
+        if (duplicate) {
+          return { ok: false, error: `A categoria "${duplicate}" já existe.` };
+        }
+        const next: CategoryMapping = { ...catalog, [clean]: [] };
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+        return { ok: true };
+      },
+
+      renameCategory: (oldName, newName) => {
+        const clean = normalizeName(newName);
+        if (!clean) {
+          return { ok: false, error: "Informe um nome para a categoria." };
+        }
+        const catalog = get().categoryCatalog;
+        if (!(oldName in catalog)) {
+          return { ok: false, error: "Categoria não encontrada." };
+        }
+        if (comparableKey(clean) !== comparableKey(oldName)) {
+          const duplicate = findExisting(Object.keys(catalog), clean);
+          if (duplicate) {
+            return { ok: false, error: `A categoria "${duplicate}" já existe.` };
+          }
+        }
+
+        // Preserva a ordem original das chaves ao renomear
+        const next: CategoryMapping = {};
+        Object.entries(catalog).forEach(([key, subs]) => {
+          next[key === oldName ? clean : key] = subs;
+        });
+
+        // Reetiqueta os lançamentos que usavam o nome antigo
+        const affected = get().transactions.filter((t) => t.category === oldName);
+        if (affected.length > 0) {
+          set((state) => ({
+            transactions: state.transactions.map((t) =>
+              t.category === oldName ? { ...t, category: clean } : t
+            ),
+          }));
+          if (isFirebaseConfigured()) {
+            saveTransactionsBulk(affected.map((t) => ({ ...t, category: clean }))).catch((err) => {
+              console.error("Erro ao reetiquetar lançamentos no Firebase:", err);
+              set({ error: (err as Error).message });
+            });
+          }
+        }
+
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+        return { ok: true };
+      },
+
+      removeCategory: (name) => {
+        const catalog = get().categoryCatalog;
+        if (!(name in catalog)) {
+          return { ok: false, error: "Categoria não encontrada." };
+        }
+        const inUse = get().transactions.filter((t) => t.category === name).length;
+        if (inUse > 0) {
+          return {
+            ok: false,
+            error: `Não é possível excluir: ${inUse} lançamento(s) usam esta categoria. Renomeie a categoria ou reclassifique os lançamentos primeiro.`,
+          };
+        }
+        const next: CategoryMapping = { ...catalog };
+        delete next[name];
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+        return { ok: true };
+      },
+
+      addSubcategory: (category, name) => {
+        const clean = normalizeName(name);
+        if (!clean) {
+          return { ok: false, error: "Informe um nome para a subcategoria." };
+        }
+        const catalog = get().categoryCatalog;
+        const current = catalog[category];
+        if (!current) {
+          return { ok: false, error: "Selecione uma categoria válida." };
+        }
+        const duplicate = findExisting(current, clean);
+        if (duplicate) {
+          return { ok: false, error: `A subcategoria "${duplicate}" já existe em ${category}.` };
+        }
+        const next: CategoryMapping = { ...catalog, [category]: [...current, clean] };
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+        return { ok: true };
+      },
+
+      renameSubcategory: (category, oldName, newName) => {
+        const clean = normalizeName(newName);
+        if (!clean) {
+          return { ok: false, error: "Informe um nome para a subcategoria." };
+        }
+        const catalog = get().categoryCatalog;
+        const current = catalog[category];
+        if (!current?.includes(oldName)) {
+          return { ok: false, error: "Subcategoria não encontrada." };
+        }
+        if (comparableKey(clean) !== comparableKey(oldName)) {
+          const duplicate = findExisting(current, clean);
+          if (duplicate) {
+            return { ok: false, error: `A subcategoria "${duplicate}" já existe em ${category}.` };
+          }
+        }
+
+        const next: CategoryMapping = {
+          ...catalog,
+          [category]: current.map((sub) => (sub === oldName ? clean : sub)),
+        };
+
+        const affected = get().transactions.filter(
+          (t) => t.category === category && t.subcategory === oldName
+        );
+        if (affected.length > 0) {
+          set((state) => ({
+            transactions: state.transactions.map((t) =>
+              t.category === category && t.subcategory === oldName
+                ? { ...t, subcategory: clean }
+                : t
+            ),
+          }));
+          if (isFirebaseConfigured()) {
+            saveTransactionsBulk(affected.map((t) => ({ ...t, subcategory: clean }))).catch(
+              (err) => {
+                console.error("Erro ao reetiquetar lançamentos no Firebase:", err);
+                set({ error: (err as Error).message });
+              }
+            );
+          }
+        }
+
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+        return { ok: true };
+      },
+
+      removeSubcategory: (category, name) => {
+        const catalog = get().categoryCatalog;
+        const current = catalog[category];
+        if (!current?.includes(name)) {
+          return { ok: false, error: "Subcategoria não encontrada." };
+        }
+        const inUse = get().transactions.filter(
+          (t) => t.category === category && t.subcategory === name
+        ).length;
+        if (inUse > 0) {
+          return {
+            ok: false,
+            error: `Não é possível excluir: ${inUse} lançamento(s) usam esta subcategoria.`,
+          };
+        }
+        const next: CategoryMapping = {
+          ...catalog,
+          [category]: current.filter((sub) => sub !== name),
+        };
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+        return { ok: true };
+      },
+
+      resetCategoryCatalog: () => {
+        const next = DEFAULT_CATEGORIES as CategoryMapping;
+        set({ categoryCatalog: next });
+        syncCatalog(next, (message) => set({ error: message }));
+      },
+
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
@@ -264,6 +503,7 @@ export const useFinancialStore = create<FinancialStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         budgetPreferences: state.budgetPreferences,
+        categoryCatalog: state.categoryCatalog,
         // Quando o Firebase está configurado, ele é a fonte da verdade;
         // localStorage guarda transações apenas em modo 100% local/offline.
         transactions: isFirebaseConfigured() ? [] : state.transactions,
@@ -309,6 +549,18 @@ export const useUpdateBudgetAllocation = () =>
   useFinancialStore((state) => state.updateBudgetAllocation);
 export const useUpdateCustomCategories = () =>
   useFinancialStore((state) => state.updateCustomCategories);
+
+// Categorias e subcategorias
+export const useCategoryCatalog = () => useFinancialStore((state) => state.categoryCatalog);
+export const useLoadCategoryCatalog = () => useFinancialStore((state) => state.loadCategoryCatalog);
+export const useAddCategory = () => useFinancialStore((state) => state.addCategory);
+export const useRenameCategory = () => useFinancialStore((state) => state.renameCategory);
+export const useRemoveCategory = () => useFinancialStore((state) => state.removeCategory);
+export const useAddSubcategory = () => useFinancialStore((state) => state.addSubcategory);
+export const useRenameSubcategory = () => useFinancialStore((state) => state.renameSubcategory);
+export const useRemoveSubcategory = () => useFinancialStore((state) => state.removeSubcategory);
+export const useResetCategoryCatalog = () =>
+  useFinancialStore((state) => state.resetCategoryCatalog);
 
 // Loading & Error
 export const useLoading = () => useFinancialStore((state) => state.loading);

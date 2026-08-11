@@ -3,6 +3,8 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   CreditCard,
   DollarSign,
   FileText,
@@ -13,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { PAGINATION } from "../../../constants";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { formatCurrency, translateTransactionType } from "../../../lib/formatters";
 import type { SortConfig, Transaction, TransactionSortKey } from "../../../types";
@@ -77,7 +80,7 @@ export const EnhancedTransactionTable = ({
   data,
   onSort,
   currentPage: initialPage = 1,
-  transactionsPerPage = 25,
+  transactionsPerPage = PAGINATION.DEFAULT_PAGE_SIZE,
   initialFilters = {},
 }: {
   data: Transaction[];
@@ -89,6 +92,7 @@ export const EnhancedTransactionTable = ({
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(initialPage);
+  const [pageSize, setPageSize] = useState(transactionsPerPage);
   const [sortConfig, setSortConfig] = useState<SortConfig<TransactionSortKey>>({
     key: "date",
     direction: "desc",
@@ -269,10 +273,30 @@ export const EnhancedTransactionTable = ({
   }, [dataWithBalance, sortConfig]);
 
   // Pagination calculations
-  const totalPages = Math.ceil(sortedData.length / transactionsPerPage);
-  const startIndex = (currentPage - 1) * transactionsPerPage;
-  const endIndex = startIndex + transactionsPerPage;
-  const paginatedData = sortedData.slice(startIndex, endIndex);
+  const totalItems = sortedData.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  // Se o número de linhas diminuiu (filtro, exclusão) a página atual pode ter
+  // deixado de existir; nesse caso mostramos a última página válida.
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedData = sortedData.slice(startIndex, startIndex + pageSize);
+
+  // Janela de páginas numeradas ao redor da atual (máx. 5 botões)
+  const pageNumbers = useMemo(() => {
+    const maxButtons = 5;
+    let first = Math.max(1, safePage - Math.floor(maxButtons / 2));
+    const last = Math.min(totalPages, first + maxButtons - 1);
+    first = Math.max(1, last - maxButtons + 1);
+    return Array.from({ length: last - first + 1 }, (_, i) => first + i);
+  }, [safePage, totalPages]);
+
+  // Mantém o estado alinhado quando a página atual passa a ser inválida
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -858,40 +882,104 @@ export const EnhancedTransactionTable = ({
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-between items-center p-6 bg-gradient-to-r from-gray-800/60 to-gray-900/60 border-t border-gray-700/50">
-          <p className="text-sm font-medium text-gray-300">
-            Exibindo{" "}
-            <span className="font-bold text-white">
-              {startIndex + 1}-{Math.min(endIndex, sortedData.length)}
-            </span>{" "}
-            of <span className="font-bold text-white">{sortedData.length}</span>
-            {(searchTerm || activeFiltersCount > 0) && (
-              <span className="text-gray-400 ml-1">(filtered from {data.length})</span>
-            )}
-          </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-              disabled={currentPage === 1}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:scale-105 disabled:hover:scale-100"
-            >
-              <ChevronLeft size={18} />
-              <span>Anterior</span>
-            </button>
-            <span className="text-base font-bold text-white px-4">
-              Page <span className="text-blue-400">{currentPage}</span> of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:scale-105 disabled:hover:scale-100"
-            >
-              <span>Próximo</span>
-              <ChevronRight size={18} />
-            </button>
+      {/* Paginação */}
+      {totalItems > 0 && (
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4 p-6 bg-gradient-to-r from-gray-800/60 to-gray-900/60 border-t border-gray-700/50">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <p className="text-sm font-medium text-gray-300">
+              Exibindo{" "}
+              <span className="font-bold text-white">
+                {startIndex + 1}-{endIndex}
+              </span>{" "}
+              de <span className="font-bold text-white">{totalItems}</span> lançamentos
+              {(searchTerm || activeFiltersCount > 0) && (
+                <span className="text-gray-400 ml-1">(filtrados de {data.length})</span>
+              )}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <label htmlFor="page-size" className="text-sm text-gray-400">
+                Por página
+              </label>
+              <select
+                id="page-size"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg bg-gray-900 border border-gray-700 px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {PAGINATION.PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          <nav aria-label="Paginação de lançamentos" className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(1)}
+              disabled={safePage === 1}
+              aria-label="Primeira página"
+              className="p-2 rounded-lg bg-gray-700/70 hover:bg-gray-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronsLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
+              disabled={safePage === 1}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-700/70 hover:bg-gray-600 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} />
+              <span className="hidden sm:inline">Anterior</span>
+            </button>
+
+            {pageNumbers[0] > 1 && <span className="px-1 text-gray-500">…</span>}
+
+            {pageNumbers.map((page) => (
+              <button
+                key={page}
+                type="button"
+                onClick={() => setCurrentPage(page)}
+                aria-current={page === safePage ? "page" : undefined}
+                className={`min-w-[38px] px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  page === safePage
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700/70 text-gray-200 hover:bg-gray-600"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            {pageNumbers[pageNumbers.length - 1] < totalPages && (
+              <span className="px-1 text-gray-500">…</span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage(Math.min(safePage + 1, totalPages))}
+              disabled={safePage === totalPages}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-700/70 hover:bg-gray-600 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="hidden sm:inline">Próximo</span>
+              <ChevronRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={safePage === totalPages}
+              aria-label="Última página"
+              className="p-2 rounded-lg bg-gray-700/70 hover:bg-gray-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronsRight size={16} />
+            </button>
+          </nav>
         </div>
       )}
     </div>
