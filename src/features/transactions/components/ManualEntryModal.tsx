@@ -1,6 +1,7 @@
 import { PlusCircle, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  useAddSubcategory,
   useAddTransaction,
   useBudgetPreferences,
   useCategoryCatalog,
@@ -26,33 +27,94 @@ export const ManualEntryModal = () => {
   const budgetPreferences = useBudgetPreferences();
   // Catálogo mantido em "Categorias e subcategorias" (tela de Categorias)
   const categoryCatalog = useCategoryCatalog();
+  const addSubcategory = useAddSubcategory();
 
   const customCategoryNames = Object.values(budgetPreferences.customCategories).flat();
-  const categories: Record<string, string[]> = {
-    ...categoryCatalog,
-    ...(customCategoryNames.length ? { Personalizadas: customCategoryNames } : {}),
-  };
+  const categories: Record<string, string[]> = useMemo(
+    () => ({
+      ...categoryCatalog,
+      ...(customCategoryNames.length ? { Personalizadas: customCategoryNames } : {}),
+    }),
+    [categoryCatalog, customCategoryNames]
+  );
+
+  const categoryNames = useMemo(
+    () => Object.keys(categories).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [categories]
+  );
 
   const [form, setForm] = useState({
     date: todayISO(),
     type: "Expense" as TransactionType,
-    category: Object.keys(categories)[0],
-    subcategory: categories[Object.keys(categories)[0]]?.[0] ?? "",
+    category: categoryNames[0] ?? "",
+    subcategory: categories[categoryNames[0] ?? ""]?.[0] ?? "",
     account: "",
     amount: "",
     note: "",
   });
+  // Quando a categoria escolhida ainda não tem subcategorias, o usuário digita
+  // uma aqui e ela é cadastrada no catálogo junto com o lançamento.
+  const [newSubcategory, setNewSubcategory] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const subcategoryOptions = categories[form.category] ?? [];
+  const CREATE_SUBCATEGORY = "__nova__";
+  const creatingSubcategory =
+    form.subcategory === CREATE_SUBCATEGORY || subcategoryOptions.length === 0;
+
+  // O catálogo pode mudar depois que o modal montou (carregamento do Firebase,
+  // criação/renomeação de categoria). Sem isso, o formulário ficaria apontando
+  // para uma categoria inexistente e salvaria lançamento sem subcategoria.
+  useEffect(() => {
+    if (categoryNames.length === 0) return;
+    if (!categoryNames.includes(form.category)) {
+      setForm((prev) => ({
+        ...prev,
+        category: categoryNames[0],
+        subcategory: categories[categoryNames[0]]?.[0] ?? "",
+      }));
+      return;
+    }
+    const options = categories[form.category] ?? [];
+    if (
+      options.length > 0 &&
+      form.subcategory !== CREATE_SUBCATEGORY &&
+      !options.includes(form.subcategory)
+    ) {
+      setForm((prev) => ({ ...prev, subcategory: options[0] }));
+    }
+  }, [categoryNames, categories, form.category, form.subcategory]);
 
   const handleCategoryChange = (category: string) => {
+    setNewSubcategory("");
     setForm((prev) => ({
       ...prev,
       category,
       subcategory: categories[category]?.[0] ?? "",
     }));
+  };
+
+  /**
+   * Resolve a subcategoria do lançamento: usa a selecionada ou cadastra no
+   * catálogo a que foi digitada, para que fique disponível nos próximos.
+   */
+  const resolveSubcategory = (): { value: string; error?: string } => {
+    if (!creatingSubcategory) {
+      return { value: form.subcategory };
+    }
+    const typed = newSubcategory.trim().replace(/\s+/g, " ");
+    if (!typed) {
+      return { value: "", error: "Informe a subcategoria do lançamento." };
+    }
+    if (!categoryCatalog[form.category]) {
+      return { value: typed };
+    }
+    const result = addSubcategory(form.category, typed);
+    if (!result.ok && result.error && !result.error.includes("já existe")) {
+      return { value: "", error: result.error };
+    }
+    return { value: typed };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,22 +130,36 @@ export const ManualEntryModal = () => {
       setErrorMsg("Informe a conta/carteira do lançamento.");
       return;
     }
+    if (!form.category) {
+      setErrorMsg("Selecione uma categoria.");
+      return;
+    }
 
+    const resolved = resolveSubcategory();
+    if (resolved.error) {
+      setErrorMsg(resolved.error);
+      return;
+    }
+    const subcategory = resolved.value;
+
+    const note = form.note.trim();
     const transaction: Transaction = {
       id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       date: new Date(form.date),
       amount: amountNumber,
       type: form.type,
       category: form.category,
-      subcategory: form.subcategory,
+      subcategory,
       account: form.account.trim(),
-      note: form.note.trim() || undefined,
+      // Campos opcionais vazios são omitidos: o Firestore recusa `undefined`
+      ...(note ? { note } : {}),
     };
 
     setSubmitting(true);
     try {
       await addTransaction(transaction);
       setOpen(false);
+      setNewSubcategory("");
       setForm((prev) => ({ ...prev, amount: "", note: "" }));
     } catch (err) {
       setErrorMsg((err as Error).message ?? "Erro ao salvar o lançamento.");
@@ -172,7 +248,7 @@ export const ManualEntryModal = () => {
                     onChange={(e) => handleCategoryChange(e.target.value)}
                     className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
                   >
-                    {Object.keys(categories).map((cat) => (
+                    {categoryNames.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>
@@ -183,18 +259,48 @@ export const ManualEntryModal = () => {
                   <label className="block text-sm text-gray-300 mb-1" htmlFor="me-subcategory">
                     Subcategoria
                   </label>
-                  <select
-                    id="me-subcategory"
-                    value={form.subcategory}
-                    onChange={(e) => setForm((p) => ({ ...p, subcategory: e.target.value }))}
-                    className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
-                  >
-                    {subcategoryOptions.map((sub: string) => (
-                      <option key={sub} value={sub}>
-                        {sub}
-                      </option>
-                    ))}
-                  </select>
+                  {creatingSubcategory ? (
+                    <div className="space-y-1">
+                      <input
+                        id="me-subcategory"
+                        type="text"
+                        value={newSubcategory}
+                        onChange={(e) => setNewSubcategory(e.target.value)}
+                        placeholder="Nome da subcategoria"
+                        className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
+                      />
+                      {subcategoryOptions.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                          Esta categoria ainda não tem subcategorias; a que você digitar será
+                          cadastrada.
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((p) => ({ ...p, subcategory: subcategoryOptions[0] }))
+                          }
+                          className="text-xs text-teal-300 hover:text-teal-200"
+                        >
+                          Escolher uma existente
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <select
+                      id="me-subcategory"
+                      value={form.subcategory}
+                      onChange={(e) => setForm((p) => ({ ...p, subcategory: e.target.value }))}
+                      className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
+                    >
+                      {subcategoryOptions.map((sub: string) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                      <option value={CREATE_SUBCATEGORY}>+ Nova subcategoria…</option>
+                    </select>
+                  )}
                 </div>
               </div>
 

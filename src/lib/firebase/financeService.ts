@@ -54,11 +54,21 @@ export interface ImportHistoryEntry {
   importedAt?: string;
 }
 
-const toPlainTransaction = (t: Transaction, userId: string) => ({
-  ...t,
-  userId,
-  date: t.date instanceof Date ? t.date.toISOString() : t.date,
-});
+/**
+ * O Firestore rejeita `undefined` em qualquer campo ("Unsupported field value:
+ * undefined"). Campos opcionais do lançamento (note, time, tags...) chegam como
+ * undefined quando o usuário não preenche, então removemos as chaves vazias
+ * antes de gravar, em vez de enviá-las com undefined.
+ */
+const stripUndefined = <T extends Record<string, unknown>>(value: T): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined));
+
+const toPlainTransaction = (t: Transaction, userId: string) =>
+  stripUndefined({
+    ...t,
+    userId,
+    date: t.date instanceof Date ? t.date.toISOString() : t.date,
+  });
 
 const fromPlainTransaction = (raw: Record<string, unknown>): Transaction => ({
   ...(raw as unknown as Transaction),
@@ -143,12 +153,15 @@ export const saveBaseline = async (baseline: Omit<Baseline, "id" | "userId"> & {
   if (!isFirebaseConfigured() || !db) return null;
   const userId = requireUserId();
   const id = baseline.id ?? doc(collection(db, BASELINES_COLLECTION)).id;
-  await setDoc(doc(db, BASELINES_COLLECTION, id), {
-    ...baseline,
-    id,
-    userId,
-    createdAt: baseline.createdAt ?? Timestamp.now().toDate().toISOString(),
-  });
+  await setDoc(
+    doc(db, BASELINES_COLLECTION, id),
+    stripUndefined({
+      ...baseline,
+      id,
+      userId,
+      createdAt: baseline.createdAt ?? Timestamp.now().toDate().toISOString(),
+    })
+  );
   return id;
 };
 
