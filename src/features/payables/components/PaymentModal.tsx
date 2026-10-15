@@ -2,6 +2,7 @@ import { AlertCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatCurrency } from "../../../lib/formatters";
 import { useMarkPayableAsPaid } from "../../../store/payablesStore";
+import { AccountInput } from "../../treasury/components/AccountInput";
 import type { Payable } from "../types";
 import { formatISODateBR, todayISO } from "../utils";
 
@@ -126,11 +127,10 @@ export const PaymentModal = ({ payable, onClose }: PaymentModalProps) => {
             <label className="block text-sm text-gray-300 mb-1" htmlFor="pm-account">
               Banco/Conta
             </label>
-            <input
+            <AccountInput
               id="pm-account"
-              type="text"
               value={account}
-              onChange={(e) => setAccount(e.target.value)}
+              onChange={setAccount}
               placeholder="Ex.: Banco Domínio"
               className={inputClass}
             />

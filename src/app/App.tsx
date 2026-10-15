@@ -42,6 +42,7 @@ import {
   useTransactions,
 } from "../store/financialStore";
 import { useLoadPayables, usePayablesStore } from "../store/payablesStore";
+import { useLoadTreasury, useTreasuryStore } from "../store/treasuryStore";
 import type { SortConfig, TransactionSortKey } from "../types";
 import { lazyLoad } from "../utils/lazyLoad";
 
@@ -80,6 +81,7 @@ const TransactionsPage = lazyLoad(
   () => import("../pages/TransactionsPage/TransactionsPage"),
   "TransactionsPage"
 );
+const TreasuryPage = lazyLoad(() => import("../pages/TreasuryPage/TreasuryPage"), "TreasuryPage");
 const PayablesPage = lazyLoad(() => import("../pages/PayablesPage/PayablesPage"), "PayablesPage");
 const BudgetGoalsSection = lazyLoad(
   () => import("../features/budget/components/BudgetGoalsSection"),
@@ -167,6 +169,8 @@ const App = () => {
   const loadCategoryCatalog = useLoadCategoryCatalog();
   const loadPayables = useLoadPayables();
   const resetPayables = usePayablesStore((state) => state.reset);
+  const loadTreasury = useLoadTreasury();
+  const resetTreasury = useTreasuryStore((state) => state.reset);
   const resetStore = useFinancialStore((state) => state.reset);
 
   // Carrega os lançamentos do usuário autenticado ao logar; limpa tudo ao deslogar
@@ -178,9 +182,11 @@ const App = () => {
       loadFromFirebase();
       loadCategoryCatalog();
       loadPayables();
+      loadTreasury();
     } else {
       resetStore();
       resetPayables();
+      resetTreasury();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, firebaseEnabled]);
@@ -360,6 +366,12 @@ const App = () => {
         <TabContent isActive={activeTab === "patterns"}>
           <Suspense fallback={<SectionSkeleton />}>
             <PatternsPage filteredData={filteredData} />
+          </Suspense>
+        </TabContent>
+
+        <TabContent isActive={activeTab === "treasury"}>
+          <Suspense fallback={<SectionSkeleton />}>
+            <TreasuryPage />
           </Suspense>
         </TabContent>
 

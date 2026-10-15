@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CreditCard,
   FileText,
+  Landmark,
   LayoutDashboard,
   LineChart,
   Receipt,
@@ -78,6 +79,12 @@ export const TABS_CONFIG = [
     label: "Assinaturas e Padrões",
     icon: Repeat,
     description: "Pagamentos recorrentes e padrões de gastos",
+  },
+  {
+    id: "treasury",
+    label: "Tesouraria",
+    icon: Landmark,
+    description: "Contas bancárias, saldo inicial e conciliação",
   },
   {
     id: "payables",

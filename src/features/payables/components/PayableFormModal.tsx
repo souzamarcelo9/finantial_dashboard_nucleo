@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useCategoryCatalog } from "../../../store/financialStore";
 import type { PayableDraft } from "../../../store/payablesStore";
 import { useCreatePayable, useUpdatePayable } from "../../../store/payablesStore";
+import { AccountInput } from "../../treasury/components/AccountInput";
 import type { Payable, PayableDirection } from "../types";
 import { parseISODate, todayISO } from "../utils";
 
@@ -261,11 +262,10 @@ export const PayableFormModal = ({
             <label className="block text-sm text-gray-300 mb-1" htmlFor="pf-account">
               Banco/Conta prevista (opcional)
             </label>
-            <input
+            <AccountInput
               id="pf-account"
-              type="text"
               value={account}
-              onChange={(e) => setAccount(e.target.value)}
+              onChange={setAccount}
               className={inputClass}
             />
           </div>

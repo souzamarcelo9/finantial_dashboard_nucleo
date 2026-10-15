@@ -8,6 +8,7 @@ import {
   useFirebaseEnabled,
 } from "../../../store/financialStore";
 import type { Transaction, TransactionType } from "../../../types";
+import { AccountInput } from "../../treasury/components/AccountInput";
 
 const TRANSACTION_TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: "Income", label: "Receita" },
@@ -43,11 +44,14 @@ export const ManualEntryModal = () => {
     [categories]
   );
 
+  // A categoria NÃO vem pré-selecionada de propósito: quando vinha, qualquer
+  // lançamento salvo sem tocar no campo era gravado silenciosamente com a
+  // primeira categoria da lista, classificando a despesa errado.
   const [form, setForm] = useState({
     date: todayISO(),
     type: "Expense" as TransactionType,
-    category: categoryNames[0] ?? "",
-    subcategory: categories[categoryNames[0] ?? ""]?.[0] ?? "",
+    category: "",
+    subcategory: "",
     account: "",
     amount: "",
     note: "",
@@ -61,19 +65,17 @@ export const ManualEntryModal = () => {
   const subcategoryOptions = categories[form.category] ?? [];
   const CREATE_SUBCATEGORY = "__nova__";
   const creatingSubcategory =
-    form.subcategory === CREATE_SUBCATEGORY || subcategoryOptions.length === 0;
+    !!form.category && (form.subcategory === CREATE_SUBCATEGORY || subcategoryOptions.length === 0);
 
   // O catálogo pode mudar depois que o modal montou (carregamento do Firebase,
   // criação/renomeação de categoria). Sem isso, o formulário ficaria apontando
   // para uma categoria inexistente e salvaria lançamento sem subcategoria.
   useEffect(() => {
     if (categoryNames.length === 0) return;
-    if (!categoryNames.includes(form.category)) {
-      setForm((prev) => ({
-        ...prev,
-        category: categoryNames[0],
-        subcategory: categories[categoryNames[0]]?.[0] ?? "",
-      }));
+    // Só reage quando a categoria escolhida sumiu (renomeada/excluída);
+    // o estado vazio inicial é intencional e não deve ser preenchido.
+    if (form.category && !categoryNames.includes(form.category)) {
+      setForm((prev) => ({ ...prev, category: "", subcategory: "" }));
       return;
     }
     const options = categories[form.category] ?? [];
@@ -248,6 +250,7 @@ export const ManualEntryModal = () => {
                     onChange={(e) => handleCategoryChange(e.target.value)}
                     className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
                   >
+                    <option value="">Selecione uma categoria…</option>
                     {categoryNames.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
@@ -259,7 +262,15 @@ export const ManualEntryModal = () => {
                   <label className="block text-sm text-gray-300 mb-1" htmlFor="me-subcategory">
                     Subcategoria
                   </label>
-                  {creatingSubcategory ? (
+                  {!form.category ? (
+                    <select
+                      id="me-subcategory"
+                      disabled
+                      className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-gray-500"
+                    >
+                      <option>Escolha a categoria primeiro</option>
+                    </select>
+                  ) : creatingSubcategory ? (
                     <div className="space-y-1">
                       <input
                         id="me-subcategory"
@@ -324,14 +335,12 @@ export const ManualEntryModal = () => {
                   <label className="block text-sm text-gray-300 mb-1" htmlFor="me-account">
                     Conta/Carteira
                   </label>
-                  <input
+                  <AccountInput
                     id="me-account"
-                    type="text"
-                    placeholder="Ex.: Nubank, Carteira"
+                    placeholder="Ex.: Banco Domínio"
                     value={form.account}
-                    onChange={(e) => setForm((p) => ({ ...p, account: e.target.value }))}
+                    onChange={(value) => setForm((p) => ({ ...p, account: value }))}
                     className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-white"
-                    required
                   />
                 </div>
               </div>
