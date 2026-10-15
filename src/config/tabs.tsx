@@ -4,6 +4,7 @@
  */
 
 import {
+  CalendarClock,
   CreditCard,
   FileText,
   LayoutDashboard,
@@ -77,6 +78,12 @@ export const TABS_CONFIG = [
     label: "Assinaturas e Padrões",
     icon: Repeat,
     description: "Pagamentos recorrentes e padrões de gastos",
+  },
+  {
+    id: "payables",
+    label: "Contas a Pagar/Receber",
+    icon: CalendarClock,
+    description: "Vencimentos, baixas e previsão de caixa",
   },
   {
     id: "transactions",

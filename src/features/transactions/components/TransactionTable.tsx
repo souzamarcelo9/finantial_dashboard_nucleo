@@ -396,7 +396,7 @@ export const EnhancedTransactionTable = ({
               }`}
             >
               <Filter size={18} />
-              <span>Filters</span>
+              <span>Filtros</span>
               {activeFiltersCount > 0 && (
                 <span className="bg-red-500 text-white text-xs rounded-full px-2.5 py-1 min-w-[1.5rem] h-6 flex items-center justify-center font-extrabold shadow-lg pulse-glow">
                   {activeFiltersCount}

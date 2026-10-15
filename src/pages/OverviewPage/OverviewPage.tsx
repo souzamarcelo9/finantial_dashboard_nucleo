@@ -27,6 +27,7 @@ import {
   SecondaryKPISection,
 } from "../../features/kpi/components/KPISections";
 import { useEnhancedKPIData } from "../../features/kpi/hooks/useCalculations";
+import { UpcomingPayablesCard } from "../../features/payables";
 import { generateSmartInsights } from "../../lib/analytics/insights";
 import {
   getCategoryConcentrationColor,
@@ -387,6 +388,11 @@ export const OverviewPage = ({
 
       {/* Transfer Information Cards */}
       <TransferInformationCard transferData={validatedAdditionalKPI.transferData} />
+
+      {/* Lembrete de vencimentos */}
+      <div className="mt-6">
+        <UpcomingPayablesCard />
+      </div>
 
       {/* Account Balances */}
       <AccountBalancesCard balances={accountBalances} />
