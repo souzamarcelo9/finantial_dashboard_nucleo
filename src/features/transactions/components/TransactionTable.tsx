@@ -9,6 +9,7 @@ import {
   DollarSign,
   FileText,
   Filter,
+  Link2,
   Search,
   Settings,
   Tag,
@@ -358,7 +359,7 @@ export const EnhancedTransactionTable = ({
             <div className="p-3 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-2xl">
               <FileText className="text-blue-400" size={24} />
             </div>
-            <h3 className="text-2xl font-bold text-white">Lançamentos Financeiros</h3>
+            <h3 className="text-2xl font-bold text-white">Movimentações do caixa (realizado)</h3>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -396,7 +397,7 @@ export const EnhancedTransactionTable = ({
               }`}
             >
               <Filter size={18} />
-              <span>Filtros</span>
+              <span>Filters</span>
               {activeFiltersCount > 0 && (
                 <span className="bg-red-500 text-white text-xs rounded-full px-2.5 py-1 min-w-[1.5rem] h-6 flex items-center justify-center font-extrabold shadow-lg pulse-glow">
                   {activeFiltersCount}
@@ -826,7 +827,18 @@ export const EnhancedTransactionTable = ({
                   className="p-3 text-sm text-gray-400 truncate group-hover:text-gray-200 transition-colors duration-300"
                   title={item.note}
                 >
-                  {item.note || "-"}
+                  <span className="flex items-center gap-1.5">
+                    {String(item.id).startsWith("payable-") && (
+                      <span
+                        className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30"
+                        title="Gerado pela baixa de uma conta a pagar/receber. Para alterar, estorne a baixa na aba Contas a Pagar/Receber."
+                      >
+                        <Link2 size={10} />
+                        baixa
+                      </span>
+                    )}
+                    <span className="truncate">{item.note || "-"}</span>
+                  </span>
                 </td>
                 <td
                   className={`p-3 font-bold text-sm ${getAmountTextColor(

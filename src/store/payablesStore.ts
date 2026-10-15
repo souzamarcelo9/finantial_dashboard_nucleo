@@ -37,6 +37,11 @@ interface PayablesStore {
   removePayable: (id: string) => Promise<void>;
   removeSeries: (seriesId: string) => Promise<void>;
   markAsPaid: (id: string, payment: PayablePaymentInput) => Promise<PayableMutationResult>;
+  /** Baixa vinculando um lançamento que JÁ existe (conciliação da importação) */
+  linkToTransaction: (
+    id: string,
+    link: { transactionId: string; paidAt: string; paidAmount: number; account: string }
+  ) => Promise<PayableMutationResult>;
   undoPayment: (id: string) => Promise<PayableMutationResult>;
   /** Mantém séries recorrentes sempre com 12 meses à frente materializados */
   extendRecurringSeries: () => Promise<void>;
@@ -193,12 +198,32 @@ export const usePayablesStore = create<PayablesStore>()(
         return get().updatePayable(atualizado);
       },
 
+      linkToTransaction: async (id, link) => {
+        const payable = get().payables.find((p) => p.id === id);
+        if (!payable) return { ok: false, error: "Conta não encontrada." };
+        if (payable.status === "paid") return { ok: false, error: "Esta conta já está baixada." };
+
+        // Nenhum lançamento é criado aqui: ele já veio da importação. Criar
+        // outro dobraria o valor no caixa.
+        return get().updatePayable({
+          ...payable,
+          status: "paid",
+          paidAt: link.paidAt,
+          paidAmount: link.paidAmount,
+          paidAccount: link.account,
+          transactionId: link.transactionId,
+        });
+      },
+
       undoPayment: async (id) => {
         const payable = get().payables.find((p) => p.id === id);
         if (!payable) return { ok: false, error: "Conta não encontrada." };
         if (payable.status !== "paid") return { ok: false, error: "Esta conta não está baixada." };
 
-        if (payable.transactionId) {
+        // Só apaga o lançamento que a própria baixa criou. Se a conta foi
+        // conciliada com um lançamento importado, ele é do extrato e deve
+        // permanecer no caixa — o estorno apenas desfaz o vínculo.
+        if (payable.transactionId?.startsWith("payable-")) {
           try {
             await useFinancialStore.getState().removeTransaction(payable.transactionId);
           } catch (err) {
@@ -288,4 +313,6 @@ export const useUpdatePayable = () => usePayablesStore((state) => state.updatePa
 export const useRemovePayable = () => usePayablesStore((state) => state.removePayable);
 export const useRemoveSeries = () => usePayablesStore((state) => state.removeSeries);
 export const useMarkPayableAsPaid = () => usePayablesStore((state) => state.markAsPaid);
+export const useLinkPayableToTransaction = () =>
+  usePayablesStore((state) => state.linkToTransaction);
 export const useUndoPayablePayment = () => usePayablesStore((state) => state.undoPayment);

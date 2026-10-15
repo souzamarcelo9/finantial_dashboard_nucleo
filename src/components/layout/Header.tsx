@@ -2,7 +2,7 @@ import { FileSpreadsheet, LogOut, Upload } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { ManualEntryModal } from "../../features/transactions/components/ManualEntryModal";
+import { NewEntryButton } from "../../features/transactions/components/NewEntryButton";
 import { useFirebaseEnabled, useSyncing } from "../../store/financialStore";
 
 interface HeaderProps {
@@ -69,7 +69,7 @@ export const Header = ({ onFileUpload }: HeaderProps) => {
 
         {/* Ações */}
         <div className="flex flex-wrap items-center gap-3 xl:shrink-0">
-          <ManualEntryModal />
+          <NewEntryButton />
 
           <label
             htmlFor="csv-upload"

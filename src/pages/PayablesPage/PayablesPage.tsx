@@ -1,10 +1,11 @@
-import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Link2, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   PayableFormModal,
   PayablesCalendar,
   PayablesTable,
   PaymentModal,
+  ReconcilePayablesModal,
   UpcomingPayablesCard,
 } from "../../features/payables";
 import type { Payable, PayableDirection } from "../../features/payables/types";
@@ -39,6 +40,7 @@ export const PayablesPage = () => {
   const [formDirection, setFormDirection] = useState<PayableDirection>("pay");
   const [editing, setEditing] = useState<Payable | null>(null);
   const [paying, setPaying] = useState<Payable | null>(null);
+  const [reconciling, setReconciling] = useState(false);
 
   const resumo = useMemo(() => {
     const abertos = payables.filter((p) => p.status === "open");
@@ -64,6 +66,15 @@ export const PayablesPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setReconciling(true)}
+            title="Procurar nos lançamentos contas que já foram pagas"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold transition-colors"
+          >
+            <Link2 size={16} />
+            Conciliar importação
+          </button>
           <button
             type="button"
             onClick={() => abrirNovo("pay")}
@@ -140,6 +151,7 @@ export const PayablesPage = () => {
         defaultDirection={formDirection}
       />
       <PaymentModal payable={paying} onClose={() => setPaying(null)} />
+      <ReconcilePayablesModal open={reconciling} onClose={() => setReconciling(false)} />
     </div>
   );
 };

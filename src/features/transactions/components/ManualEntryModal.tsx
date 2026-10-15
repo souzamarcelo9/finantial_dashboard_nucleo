@@ -21,8 +21,25 @@ const TRANSACTION_TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export const ManualEntryModal = () => {
-  const [open, setOpen] = useState(false);
+interface ManualEntryModalProps {
+  /** Modo controlado: quem abre é o seletor unificado de entrada */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Esconde o botão próprio quando o modal é aberto de fora */
+  hideTrigger?: boolean;
+}
+
+export const ManualEntryModal = ({
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
+}: ManualEntryModalProps = {}) => {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (value: boolean) => {
+    setOpenState(value);
+    onOpenChange?.(value);
+  };
   const addTransaction = useAddTransaction();
   const firebaseEnabled = useFirebaseEnabled();
   const budgetPreferences = useBudgetPreferences();
@@ -172,14 +189,16 @@ export const ManualEntryModal = () => {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold rounded-xl cursor-pointer hover:from-purple-500 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-purple-500/25"
-      >
-        <PlusCircle size={18} className="mr-2" />
-        Novo Lançamento
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold rounded-xl cursor-pointer hover:from-purple-500 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-purple-500/25"
+        >
+          <PlusCircle size={18} className="mr-2" />
+          Novo Lançamento
+        </button>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">

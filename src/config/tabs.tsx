@@ -90,12 +90,12 @@ export const TABS_CONFIG = [
     id: "payables",
     label: "Contas a Pagar/Receber",
     icon: CalendarClock,
-    description: "Vencimentos, baixas e previsão de caixa",
+    description: "Previsto: vencimentos, baixas e previsão de caixa",
   },
   {
     id: "transactions",
-    label: "Lançamentos",
+    label: "Movimentações",
     icon: Receipt,
-    description: "Lista detalhada de lançamentos com filtros",
+    description: "Realizado: tudo que já entrou ou saiu do caixa",
   },
 ];
